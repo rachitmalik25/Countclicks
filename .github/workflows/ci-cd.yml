@@ -1,0 +1,143 @@
+name: CI and CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Run unit and integration tests
+        run: mvn --batch-mode --no-transfer-progress test
+
+  build:
+    name: Build application
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Package application
+        run: mvn --batch-mode --no-transfer-progress -DskipTests package
+
+      - name: Upload application JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: countclicks-jar
+          path: target/countclicks-0.0.1-SNAPSHOT.jar
+          if-no-files-found: error
+
+  sonar-analysis:
+    name: SonarQube analysis (placeholder)
+    needs: [unit-tests, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: SonarQube placeholder
+        run: echo "SonarQube is not configured. Add the scanner, server URL, and token when available."
+
+  publish:
+    name: Publish container to GitHub Packages
+    needs: [unit-tests, build, sonar-analysis]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.name }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Download application JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: countclicks-jar
+          path: target
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve lowercase image name
+        id: image
+        run: echo "name=ghcr.io/$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Build and publish container
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.image.outputs.name }}:latest
+            ${{ steps.image.outputs.name }}:${{ github.sha }}
+
+  deploy-development:
+    name: Deploy to development (placeholder)
+    needs: publish
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+    steps:
+      - name: Development deployment placeholder
+        env:
+          IMAGE: ${{ needs.publish.outputs.image }}:${{ github.sha }}
+        run: echo "Replace this placeholder with your development deployment command for $IMAGE"
+
+  deploy-staging:
+    name: Deploy to staging (placeholder)
+    needs: [deploy-development, publish]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    steps:
+      - name: Staging deployment placeholder
+        env:
+          IMAGE: ${{ needs.publish.outputs.image }}:${{ github.sha }}
+        run: echo "Replace this placeholder with your staging deployment command for $IMAGE"
+
+  deploy-production:
+    name: Deploy to production (placeholder)
+    needs: [deploy-staging, publish]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - name: Production deployment placeholder
+        env:
+          IMAGE: ${{ needs.publish.outputs.image }}:${{ github.sha }}
+        run: echo "Replace this placeholder with your production deployment command for $IMAGE"

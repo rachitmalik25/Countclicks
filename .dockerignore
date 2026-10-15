@@ -1,0 +1,6 @@
+.git
+.github
+.mvn
+src
+target/*
+!target/countclicks-0.0.1-SNAPSHOT.jar
